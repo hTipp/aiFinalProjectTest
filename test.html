@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dodge and Destroy</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #222;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const player = {
+      x: 400,
+      y: 300,
+      size: 20,
+      speed: 4,
+      color: "black",
+      dx: 0,
+      dy: 0
+    };
+
+    const bullets = [];
+    const enemies = [];
+    const enemyCount = 5;
+    let level = 1;
+    let gameStarted = false;
+    let score = 0;
+    let startTime;
+
+    function spawnEnemies() {
+      enemies.length = 0;
+      for (let i = 0; i < enemyCount + level - 1; i++) {
+        const radius = 15;
+        let x = Math.random() * (canvas.width - radius * 2) + radius;
+        let y = Math.random() * (canvas.height - radius * 2) + radius;
+        // Make sure enemies don't spawn too close to player
+        while (Math.abs(x - player.x) < 100 && Math.abs(y - player.y) < 100) {
+          x = Math.random() * (canvas.width - radius * 2) + radius;
+          y = Math.random() * (canvas.height - radius * 2) + radius;
+        }
+        enemies.push({ x, y, radius, speed: 1 + level * 0.3 });
+      }
+    }
+
+    function drawPlayer() {
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x - player.size / 2, player.y - player.size / 2, player.size, player.size);
+    }
+
+    function drawEnemies() {
+      ctx.fillStyle = "red";
+      enemies.forEach(e => {
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function drawBullets() {
+      ctx.fillStyle = "blue";
+      bullets.forEach(b => {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function movePlayer() {
+      player.x += player.dx;
+      player.y += player.dy;
+
+      if (player.x < 0) player.x = 0;
+      if (player.y < 0) player.y = 0;
+      if (player.x > canvas.width) player.x = canvas.width;
+      if (player.y > canvas.height) player.y = canvas.height;
+    }
+
+    function moveEnemies() {
+      enemies.forEach(e => {
+        const angle = Math.atan2(player.y - e.y, player.x - e.x);
+        e.x += Math.cos(angle) * e.speed;
+        e.y += Math.sin(angle) * e.speed;
+      });
+    }
+
+    function moveBullets() {
+      bullets.forEach(b => {
+        b.x += b.dx;
+        b.y += b.dy;
+      });
+    }
+
+    function detectCollisions() {
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          const dx = bullets[i].x - enemies[j].x;
+          const dy = bullets[i].y - enemies[j].y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < enemies[j].radius + 5) {
+            enemies.splice(j, 1);
+            bullets.splice(i, 1);
+            break;
+          }
+        }
+      }
+
+      for (let i = 0; i < enemies.length; i++) {
+        const dx = enemies[i].x - player.x;
+        const dy = enemies[i].y - player.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < enemies[i].radius + player.size / 2) {
+          alert("Game Over! Final Score: " + score);
+          document.location.reload();
+        }
+      }
+    }
+
+    function updateScore() {
+      score = Math.floor((Date.now() - startTime) / 1000);
+    }
+
+    function drawScore() {
+      ctx.fillStyle = "black";
+      ctx.font = "20px Arial";
+      ctx.fillText("Level: " + level + " | Score: " + score, 10, 20);
+    }
+
+    function update() {
+      if (gameStarted) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        movePlayer();
+        moveEnemies();
+        moveBullets();
+        detectCollisions();
+        updateScore();
+
+        drawPlayer();
+        drawEnemies();
+        drawBullets();
+        drawScore();
+
+        if (enemies.length === 0) {
+          level++;
+          spawnEnemies();
+        }
+      }
+
+      requestAnimationFrame(update);
+    }
+
+    document.addEventListener("keydown", e => {
+      if (!gameStarted) {
+        gameStarted = true;
+        startTime = Date.now();
+        spawnEnemies();
+      }
+      if (e.key === "ArrowRight") player.dx = player.speed;
+      if (e.key === "ArrowLeft") player.dx = -player.speed;
+      if (e.key === "ArrowUp") player.dy = -player.speed;
+      if (e.key === "ArrowDown") player.dy = player.speed;
+    });
+
+    document.addEventListener("keyup", e => {
+      if (["ArrowRight", "ArrowLeft"].includes(e.key)) player.dx = 0;
+      if (["ArrowUp", "ArrowDown"].includes(e.key)) player.dy = 0;
+    });
+
+    canvas.addEventListener("click", e => {
+      if (!gameStarted) return;
+      const angle = Math.atan2(e.offsetY - player.y, e.offsetX - player.x);
+      bullets.push({
+        x: player.x,
+        y: player.y,
+        dx: Math.cos(angle) * 6,
+        dy: Math.sin(angle) * 6
+      });
+    });
+
+    update();
+  </script>
+</body>
+</html>
